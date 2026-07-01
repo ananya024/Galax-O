@@ -4,9 +4,12 @@ import { useEffect , useRef, useState} from "react";
 import { getProfile, getAllUsers } from "../api/users";
 import { connectSocket } from "../socket";
 import  { getConversation, getUnreadCounts } from "../api/messages"
+import { useNavigate } from "react-router-dom";
+
 
 function Chat() {
   
+  const navigate=useNavigate();
   const [me, setMe] = useState({username:"", userId:""});
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -23,7 +26,9 @@ function Chat() {
 
     const selected = selectedUserRef.current;
     const meUser = meRef.current;
-
+    console.log("MSG:", msg);
+    console.log("ME:", meRef.current);
+    console.log("SELECTED:", selectedUserRef.current);
     if((msg.sender===meUser?.username && msg.receiver===selected?.username) || (msg.sender===selected?.username && msg.receiver===meUser?.username))
       setMessages(prev => [...prev, msg]);
     else
@@ -53,6 +58,18 @@ function Chat() {
           }))
       );
   };
+  const handleDeliveredMsg =  ({messageId}) => { 
+      setMessages(prev =>
+        prev.map(msg => msg.messageId === messageId ? { ...msg, isDelivered: true } : msg)
+      );
+  }
+
+  const handleLogout =() =>{
+    localStorage.removeItem("token");
+    socketRef.current?.disconnect();
+    navigate("/login");
+  }
+
 
   useEffect(()=> {
     async function initChat(){
@@ -86,6 +103,7 @@ function Chat() {
       socket.on("user-offline", handleUserOffline);
       socket.on("system-message", handleSystemMessage);
       socket.on("online-users", handleOnlineUsers);
+      socket.on("message-delivered",handleDeliveredMsg);
       
       return () => {
           socket.off("private-message", handlePrivateMessage);
@@ -93,6 +111,7 @@ function Chat() {
           socket.off("user-offline", handleUserOffline);
           socket.off("system-message", handleSystemMessage);
           socket.off("online-users", handleOnlineUsers);
+          socket.off("message-delivered",handleDeliveredMsg);
           socket.disconnect();
       };
   }, [token]);
@@ -110,61 +129,6 @@ function Chat() {
       behavior:"smooth"
     });
   }, [messages]);
-
-  // useEffect(() => {
-
-  //   const socket = socketRef.current;
-  //   socket.on("connect", () => {
-  //     console.log("connected");
-  //     // console.log("from chat ",me.username," is connected to socket ",socketRef.current.id);
-  //   });
-  //   socket.on("online-users", (onlineUsers)=>{
-  //     // console.log("ONLINE USERS", onlineUsers);
-  //     console.log("FRONTEND SOCKET", socket.id);
-  //     setUsers(prev=> prev.map(user => ({...user, online:onlineUsers.includes(user.username)})));
-  //   })
-  //   return () => {
-  //     socket.disconnect();
-  //   };
-  // }, []);
-  
-  // useEffect(() => {
-
-  //   console.log("ATTACHING PRIVATE LISTENER");
-  //   const socket=socketRef.current;
-  //   socket.on("private-message", handlePrivateMessage);
-  //   return () =>{
-  //     console.log("REMOVING PRIVATE LISTENER");
-  //     socket.off("private-message", handlePrivateMessage);
-  //   }
-  // }, [selectedUser, me.username]);
-  
-  // useEffect(() => {
-
-  //   const socket = socketRef.current;
-  //   socket.on("system-message",handleSystemMessage);
-  //   return () => {
-  //     socket.off("system-message", handleSystemMessage);
-  //   }
-  // }, []);
-  
-  // useEffect(() => {
-
-  //   const socket = socketRef.current;
-  //   socket.on("user-online", handleUserOnline);
-  //   return () => {
-  //     socket.off("user-online", handleUserOnline);
-  //   };
-  // }, []);
-  
-  // useEffect(() => {
-
-  //   const socket = socketRef.current;
-  //   socket.on("user-offline", handleUserOffline);
-  //   return () => {
-  //     socket.off("user-offline", handleUserOffline);
-  //   };
-  // }, []);
   
   useEffect(()=>{
     if(!selectedUser)
@@ -200,10 +164,13 @@ function Chat() {
     setError(null);
   }
 
-  function formatTime(time){
-    return new Date(time).toLocaleTimeString([],{
+  function formatTime(time) {
+    return new Date(time).toLocaleString([], {
       hour: "numeric",
-      minute: "2-digit"
+      minute: "2-digit",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric"
     });
   }
   
@@ -235,6 +202,9 @@ function Chat() {
                         ))
         }
       </div>
+      <button onClick={handleLogout}>
+          Logout
+      </button>
     </div>
     
     <div className="chat-section">
@@ -252,14 +222,14 @@ function Chat() {
 
       <div className="chat-messages">
         {messages.map((msg,index)=> {
-          // console.log("if u wanna add console");
+          // console.log("if u wanna add console", msg);
           return(
             <div key={index} className={msg.sender===me.username ? "message sent" : "message received"}>
               <div className="message-text">
                 {msg.content}
               </div>
               <div className="message-time">
-                {formatTime(msg.timestamp)}
+                {formatTime(msg.createdAt)}
                 {msg.isRead? "✔️✔️" : (msg.isDelivered? "✔✔": "✔")}
               </div>
             </div>

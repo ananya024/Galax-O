@@ -11,9 +11,10 @@ export class User {
     @Column({unique:true, nullable:false})
     username!:string;
 
-    @Column({nullable:false})
+    @Column({nullable:false, select:false})
     password!:string;
 
+    // lower 2only for maping not for table
     @OneToMany(() => Message, message => message.sender)
     sentMessages!: Message[];
 

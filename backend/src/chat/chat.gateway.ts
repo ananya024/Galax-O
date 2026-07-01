@@ -13,8 +13,6 @@ export class ChatGateway {
     private jwtService: JwtService,
     private messageService: MessagesService,
     private usersService: UsersService,
-    // @InjectRepository(Message)
-    // private messageRepository: Repository<Message>
   ) {
     // console.log('Gateway created');
   }
@@ -35,25 +33,17 @@ export class ChatGateway {
         client.disconnect();
         return;
       }
-    // /////////////////////////////////////////////////////////////////////////////////////
-    // const user1 = await this.usersService.findOneById(this.socketToUser[client.id].userId);
-    // if(!user1 )
-    //   return;
-    // const uid=user1.userId;
-    // const msgs= await this.messageRepository.find({where: [{ receiver: { userId: uid } }],
-    //                                                 relations: {sender: true, receiver: true},
-    //                                                 order:{createdAt:'ASC'}})
-    // for(let msg of msgs)
-    // {
-    //   if(msg.receiver.userId===uid) {
-    //     msg.isDelivered=true;
-    //   }
-    // }
-    // await this.messageRepository.save(msgs);
-  // //////////////////////////////////////////////////////////////////////////////////////
     const payload = await this.jwtService.verifyAsync(token);
+    const deliveredMsgs = await this.messageService.markDelivered(payload.sub);
     console.log("CONNECTED", payload.username, client.id);
-      // console.log(payload);
+    for (const msg of deliveredMsgs) {
+
+        const senderSocket = this.onlineUsers.get(msg.sender.userId);
+
+        if (senderSocket) {
+            this.server.to(senderSocket).emit("message-delivered", { messageId: msg.messageId });
+        }
+    }
     this.onlineUsers.set(payload.sub, client.id);
     this.server.emit('user-online', {username: payload.username,});
     this.socketToUser.set(client.id, { userId: payload.sub, username: payload.username,});
@@ -85,7 +75,8 @@ export class ChatGateway {
     const senderdetails= this.socketToUser.get(client.id);
     if(!senderdetails)
       return;
-    await this.messageService.create(senderdetails.userId, payload);
+    const message = await this.messageService.create(senderdetails.userId, payload);
+    console.log("MESSAGEGEGEEEGGEEGE", message);
     // const suser= await this.usersService.findOneById(senderdetails.userId);
     const ruser= await this.usersService.findOneByUname(payload.receivername);
     // if(!user)
@@ -93,22 +84,22 @@ export class ChatGateway {
     const receiverSocketId = this.onlineUsers.get(ruser!.userId);
     console.log("receiver socket id =", receiverSocketId);
     console.log("sender socket id   =", client.id);
-    const message = {
-      sender: senderdetails.username,
-      receiver: payload.receivername,
-      content: payload.content,
-      timestamp: new Date(),
-    };
+    // const message = {
+    //   sender: senderdetails.username,
+    //   receiver: payload.receivername,
+    //   content: payload.content,
+    //   createdAt: new Date(),
+    // };
     const tymsg = {
       sender: payload.receivername, 
       receiver: senderdetails.username, 
       content:'Thank you for the message', 
-      timestamp:new Date()
+      createdAt:new Date()
     }
     const offlinemsg = { 
       // sender: 'server', receiver: senderdetails.username, 
       content:"User offline. Message sent in chat.", 
-      timestamp:new Date()
+      createdAt:new Date()
     }
 
     if(receiverSocketId)
@@ -120,7 +111,7 @@ export class ChatGateway {
       this.server.to(client.id).emit('private-message',message);
       
       // this.server.to(receiverSocketId)
-      //            .emit('private-message', {sender: senderdetails.username, receiver: payload.receivername, content:payload.content, timestamp:new Date()})
+      //            .emit('private-message', {sender: senderdetails.username, receiver: payload.receivername, content:payload.content, createdAt:new Date()})
 
       const today = new Date().toISOString().split("T")[0];
       const ty= [senderdetails.username, payload.receivername].sort().join("-")
@@ -140,8 +131,4 @@ export class ChatGateway {
 
     return;// {ok:true};
   }
-}import { Repository } from 'typeorm';
-import { Message } from 'src/messages/entities/message.entity';
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-
+}

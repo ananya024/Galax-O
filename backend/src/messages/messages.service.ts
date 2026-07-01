@@ -36,7 +36,17 @@ export class MessagesService {
       throw new Error("users not found");
     // const newMsg = { sender, receiver, content: createMessageDto.content}
     const newMsg = this.messageRepository.create({ sender, receiver, content: createMessageDto.content});
-    return this.messageRepository.save(newMsg);
+    const saved = await this.messageRepository.save(newMsg);
+
+    return {
+        messageId: saved.messageId,
+        sender: saved.sender.username,
+        receiver: saved.receiver.username,
+        content: saved.content,
+        createdAt: saved.createdAt,
+        isRead: saved.isRead,
+        isDelivered: saved.isDelivered,
+    };
   }
 
   async allhistory(senderId:string) {
@@ -52,9 +62,9 @@ export class MessagesService {
   }
 
   async unreadCount(loggedInUserId:string) {
-    const msgs= await this.messageRepository.find({where: [{ receiver:{userId:loggedInUserId}, isRead:false}], 
-                                                   relations: {sender: true, receiver: true},
-                                                   order:{createdAt:'ASC'}})
+    const msgs= await this.messageRepository.find({ where: [{ receiver:{userId:loggedInUserId}, isRead:false}], 
+                                                    relations: {sender: true, receiver: true},
+                                                    order:{createdAt:'ASC'}})
     
     // const count={};
     const count: Record<string, number> = {};
@@ -66,6 +76,19 @@ export class MessagesService {
         count[msg.sender.username]=1;
     }
     return count; 
+  }  
+
+    async markDelivered(loggedInUserId:string) {
+    const msgs= await this.messageRepository.find({ where: { receiver:{userId:loggedInUserId}, isDelivered:false}, 
+                                                    relations: {sender: true, receiver: true},
+                                                    order:{createdAt:'ASC'}
+                                                  })
+    for(let msg of msgs)
+    {
+      msg.isDelivered=true;
+    }
+    await this.messageRepository.save(msgs); 
+    return msgs;
   }  
 
   async userhistory(senderId:string,receivername:string) {
@@ -90,7 +113,7 @@ export class MessagesService {
     await this.messageRepository.save(msgs);
     // save is used, but TypeORM sees that these entities already exist in the database
     // so performs UPDATE instead of INSERT.
-    return msgs.map(msg => ({sender: msg.sender.username, receiver: msg.receiver.username, content: msg.content, createdAt:msg.createdAt, isRead:msg.isRead, isDelivered:msg.isDelivered}));
+    return msgs.map(msg => ({messageId:msg.messageId, sender: msg.sender.username, receiver: msg.receiver.username, content: msg.content, createdAt:msg.createdAt, isRead:msg.isRead, isDelivered:msg.isDelivered}));
   }
 
   // update(id: string, updateMessageDto: UpdateMessageDto) {

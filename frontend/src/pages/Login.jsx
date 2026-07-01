@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginUser } from "../api/auth";
+import "../styles/Auth.css";
 
 function Login() {
     const [formData, setFormData] = useState({username:"", password:""});
@@ -29,25 +30,36 @@ function Login() {
     }
     
   return (
-    <form onSubmit={handleSubmit}>
-        <h1>Login</h1>
-        <input
-            type="text"
-            name="username"
-            placeholder="Username"
-            value={formData.username}
-            onChange={handleChange}
-        />
-        <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={handleChange}
-        />
-        <button type="submit">Login</button>
-        <p>Dont have an account?<Link to="/register">Register</Link></p>
-    </form>
+    <div className="auth-page">
+        <div className="auth-card">
+            <form className="auth-form" onSubmit={handleSubmit}>
+                <h1 className="auth-title">PulseChat</h1>
+                <p className="auth-subtitle">Welcome back</p>
+                <input
+                    className="auth-input"
+                    type="text"
+                    name="username"
+                    placeholder="Username"
+                    value={formData.username}
+                    onChange={handleChange}
+                />
+                <input
+                    className="auth-input"
+                    type="password"
+                    name="password"
+                    placeholder="Password"
+                    value={formData.password}
+                    onChange={handleChange}
+                />
+                <button className="auth-button" type="submit">Login</button>
+                <p className="auth-footer">
+                    Don't have an account?
+                    <Link to="/register"> Register</Link>
+                </p>
+            </form>
+        </div>
+    </div>
+
   );
 }
 

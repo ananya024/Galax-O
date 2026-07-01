@@ -49,7 +49,11 @@ export class UsersService {
   }
 
   async authUser(username: string, password:string){
-    const user= await this.userRepository.findOneBy({username:username})
+    // const user= await this.userRepository.findOneBy({username:username})
+    const user = await this.userRepository.findOne({
+                                                      where: { username },
+                                                      select: { userId: true, username: true, password: true, }
+                                                    });
     if(!user)
       return null;
     const valid = await bcrypt.compare(password, user.password);
