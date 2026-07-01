@@ -1,3 +1,5 @@
+// constants.ts
+
 export const jwtConstants = {
-  secret: 'raunakSecretKey',
+  secret: 'mySecretChat',
 };
