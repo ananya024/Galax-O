@@ -11,8 +11,7 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       "http://localhost:5173",
-      "https://pulse-chat-amber.vercel.app",
-      // "https://pulse-chat-b5s7iwldw-ananya024s-projects.vercel.app",
+      "https://galax-o.vercel.app",
     ],
     credentials: true,
   });
