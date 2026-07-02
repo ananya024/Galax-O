@@ -33,7 +33,7 @@ function Login() {
     <div className="auth-page">
         <div className="auth-card">
             <form className="auth-form" onSubmit={handleSubmit}>
-                <h1 className="auth-title">PulseChat</h1>
+                <h1 className="auth-title">Galax¡O</h1>
                 <p className="auth-subtitle">Welcome back</p>
                 <input
                     className="auth-input"

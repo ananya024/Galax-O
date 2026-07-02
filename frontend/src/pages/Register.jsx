@@ -32,7 +32,7 @@ function Register() {
     <div className="auth-page">
       <div className="auth-card">
         <form className="auth-form" onSubmit={handleSubmit}>
-          <h1 className="auth-title">PulseChat</h1>
+          <h1 className="auth-title">Galax¡O</h1>
           <p className="auth-subtitle">Create your account</p>
           <input
               className="auth-input"
