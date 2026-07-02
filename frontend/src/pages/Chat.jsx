@@ -202,9 +202,13 @@ function Chat() {
                         ))
         }
       </div>
-      <button onClick={handleLogout}>
-          Logout
-      </button>
+
+      <div className="sidebar-footer">
+          <p className="logged-in-text"> Logged in as </p>
+          <h3 className="logged-in-user"> {me.username} </h3>
+          <button className="logout-button" onClick={handleLogout} > Logout </button>
+      </div>
+      
     </div>
     
     <div className="chat-section">
