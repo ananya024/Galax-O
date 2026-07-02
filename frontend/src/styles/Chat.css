@@ -1,5 +1,53 @@
 /* Chat.css */
 
+.bg1,
+.bg2,
+.bg3{
+
+    position:absolute;
+
+    border-radius:50%;
+
+    filter:blur(120px);
+
+    opacity:.35;
+
+    z-index:0;
+
+    animation:floatBlob 18s ease-in-out infinite;
+
+}.bg1{
+    width:420px;
+    height:420px;
+    background:#7c3aed;
+
+    top:40px;
+    left:40px;
+}
+
+.bg2{
+    width:350px;
+    height:350px;
+    background:#06b6d4;
+
+    top:18%;
+    right:40px;
+
+    animation-delay:5s;
+}
+
+.bg3{
+    width:300px;
+    height:300px;
+    background:#2563eb;
+
+    bottom:40px;
+    left:40%;
+    transform:translateX(-50%);
+
+    animation-delay:10s;
+}
+
 *{
     margin:0;
     padding:0;
@@ -12,9 +60,24 @@ body{
 }
 
 .chat-container{
+    position:relative;
+    overflow:hidden;
+
     display:flex;
     height:100vh;
-    background:#08111f;
+
+    background:
+        linear-gradient(
+            135deg,
+            #050816,
+            #0b1023,
+            #0e1834,
+            #09101f
+        );
+
+    background-size:400% 400%;
+
+    animation:gradientMove 18s ease infinite;
 }
 
 /* ===========================
@@ -22,13 +85,16 @@ body{
 =========================== */
 
 .sidebar{
+    position:relative;
+    z-index:2;
     width:320px;
-    background:#0d1627;
+    background:rgba(15,23,42,.55);
+    backdrop-filter:blur(18px);
+    -webkit-backdrop-filter:blur(18px);
+    border-right:1px solid rgba(255,255,255,.08);
     border-right:1px solid rgba(0,170,255,.15);
-
     display:flex;
     flex-direction:column;
-
     box-shadow:
     0 0 20px rgba(0,150,255,.08);
 }
@@ -79,11 +145,11 @@ body{
 
 .selected{
 
-    background:#16365d;
+    background:rgba(124,58,237,.25);
 
     box-shadow:
-    inset 4px 0 #38bdf8,
-    0 0 18px rgba(56,189,248,.25);
+        inset 4px 0 #8b5cf6,
+        0 0 28px rgba(124,58,237,.45);
 
 }
 
@@ -164,19 +230,27 @@ body{
 
 .chat-section{
 
+    position:relative;
+
+    z-index:2;
+
     flex:1;
 
     display:flex;
 
     flex-direction:column;
 
-    background:#111c2f;
+    background:rgba(255,255,255,.03);
+
+    backdrop-filter:blur(8px);
 
 }
 
 .chat-header{
 
-    background:#0d1627;
+    background:rgba(255,255,255,.04);
+
+    backdrop-filter:blur(12px);
 
     padding:18px 24px;
 
@@ -310,7 +384,9 @@ body{
 
     padding:18px;
 
-    background:#0d1627;
+    background:rgba(255,255,255,.04);
+
+    backdrop-filter:blur(12px);
 
     border-top:1px solid rgba(255,255,255,.05);
 
@@ -328,7 +404,9 @@ body{
 
     border-radius:12px;
 
-    background:#1b2d49;
+    background:rgba(255,255,255,.08);
+
+    border:1px solid rgba(255,255,255,.08);
 
     color:white;
 
@@ -440,5 +518,72 @@ body{
 
     box-shadow:
         0 0 18px rgba(56,130,246,.7);
+
+}
+
+
+@keyframes floatBlob{
+
+    0%{
+
+        transform:
+            translate(0,0)
+            scale(1);
+
+    }
+
+    25%{
+
+        transform:
+            translate(60px,-40px)
+            scale(1.12);
+
+    }
+
+    50%{
+
+        transform:
+            translate(-30px,40px)
+            scale(.95);
+
+    }
+
+    75%{
+
+        transform:
+            translate(50px,20px)
+            scale(1.08);
+
+    }
+
+    100%{
+
+        transform:
+            translate(0,0)
+            scale(1);
+
+    }
+
+}
+
+@keyframes gradientMove{
+
+    0%{
+
+        background-position:0% 50%;
+
+    }
+
+    50%{
+
+        background-position:100% 50%;
+
+    }
+
+    100%{
+
+        background-position:0% 50%;
+
+    }
 
 }

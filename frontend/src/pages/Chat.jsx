@@ -176,6 +176,9 @@ function Chat() {
   
   return (
   <div className="chat-container">
+    <div className="bg1"></div>
+    <div className="bg2"></div>
+    <div className="bg3"></div>
     <div className="sidebar">
       <h2 className="sidebar-title">Chats</h2>
       <div className="user-list">
@@ -208,7 +211,7 @@ function Chat() {
           <h3 className="logged-in-user"> {me.username} </h3>
           <button className="logout-button" onClick={handleLogout} > Logout </button>
       </div>
-      
+
     </div>
     
     <div className="chat-section">
