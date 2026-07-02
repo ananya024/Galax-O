@@ -1,3 +1,5 @@
+// main.ts
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -6,7 +8,15 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // for FRONTEND
-  app.enableCors({ origin: "http://localhost:5173", credentials: true });
+  app.enableCors({
+    origin: [
+      "http://localhost:5173",
+      "https://pulse-chat-amber.vercel.app",
+      "https://pulse-chat-b5s7iwldw-ananya024s-projects.vercel.app",
+    ],
+    credentials: true,
+  });
+  // app.enableCors({ origin: "http://localhost:5173", credentials: true });
   // ................
   
   const config = new DocumentBuilder()
