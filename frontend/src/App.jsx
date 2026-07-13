@@ -1,6 +1,6 @@
 // App.jsx
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import api from "./api/axios";
 import { Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
@@ -9,13 +9,44 @@ import Chat from "./pages/Chat";
 import Users from "./pages/Users";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
+import ServerLoader from "./components/ServerLoader";
+import { serverLoaded } from "./api/users";
 
 function App() {
-  // useEffect(() => {
-  //   api.get("/users") 
-  //     .then((response) => { console.log(response.data); })
-  //     .catch((error) => { console.error(error); });
-  // }, []);
+    // useEffect(() => {
+        //   api.get("/users") 
+        //     .then((response) => { console.log(response.data); })
+        //     .catch((error) => { console.error(error); });
+        // }, []);
+        
+    const [loaded, setLoaded] = useState(false);
+        
+    useEffect(() => {
+    const interval = setInterval(async () => {
+        try {
+        console.log("Trying...");
+
+        const response = await serverLoaded();
+
+        console.log("Response:", response);
+        console.log("Data:", response.data);
+
+        if (response.data) {
+            console.log("SUCCESS");
+            setLoaded(true);
+            clearInterval(interval);
+        }
+        } catch (err) {
+        console.log(err);
+        }
+    }, 2000);
+
+    return () => clearInterval(interval);
+    }, []);
+
+        if (!loaded) {
+            return <ServerLoader />;
+        }
 
   return(
     <>

@@ -32,6 +32,11 @@ export class UsersController {
     return this.usersService.findAll();
   }
   
+  @Get('loaded')
+  loadedServer() {
+    return true;
+  }
+  
   @ApiBearerAuth('jwt-auth')
   @UseGuards(AuthGuard)
   @Get(':username')

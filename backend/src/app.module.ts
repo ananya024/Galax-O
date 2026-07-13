@@ -18,9 +18,14 @@ import {
 } from '@nestjs/common';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 
+
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    // ConfigModule.forRoot({
+    //   isGlobal: true,
+    //   envFilePath: '.env',
+    // }),
     TypeOrmModule.forRoot({
       type: 'postgres',
       // host: process.env.DB_HOST,
@@ -38,11 +43,12 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
     UsersModule,
     AuthModule,
     MessagesModule],
-  controllers: [AppController],
-  providers: [AppService],
-})
-export class AppModule implements NestModule{
-  configure(consumer: MiddlewareConsumer) {
+    controllers: [AppController],
+    providers: [AppService],
+  })
+  export class AppModule implements NestModule{
+    configure(consumer: MiddlewareConsumer) {
       consumer.apply(LoggerMiddleware).forRoutes('*');
+      // console.log("DATABASE_URL:", process.env.DATABASE_URL);
   }
 }

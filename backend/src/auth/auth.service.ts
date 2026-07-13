@@ -16,7 +16,7 @@ export class AuthService {
         const user= await this.usersService.authUser(userName, pass);
         if(user===null)
         {
-            this.logger.log(`User doesn't exist`);
+            this.logger.warn(`User doesn't exist`);
             throw new NotFoundException({
                 code: "USER_NOT_FOUND",
                 message: "User not found",

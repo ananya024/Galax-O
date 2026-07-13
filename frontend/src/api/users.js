@@ -3,5 +3,6 @@
 import api from "./axios";
 
 export const getAllUsers = () => api.get("/users");
+export const serverLoaded = () => api.get("/users/loaded");
 export const getUser = (username) => api.get(`/users/${username}`);
 export const getProfile = () => api.get("/auth/profile");
