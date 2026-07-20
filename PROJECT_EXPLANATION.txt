@@ -1,0 +1,636 @@
+====================================================================
+SECTION 1 — PROJECT OVERVIEW
+====================================================================
+
+1.1 What this project is
+Galax-O is a modern, high-performance, real-time multi-user chat application designed to support sub-second messaging capabilities. The application features a decoupled, full-stack architecture comprising:
+  * A stateful, real-time, bi-directional backend server powered by NestJS (v11) and TypeScript.
+  * A modular, reactive frontend interface implemented in React (v19) and Vite.
+  * A relational Postgres database instance accessed via the TypeORM Object-Relational Mapper (ORM) to handle data persistence, indexing, and relationships.
+  * Stateful, bi-directional Socket.IO gateways to coordinate real-time events, user presence indicators, message routing, and delivery checkmarks.
+
+1.2 Overall Objective
+The primary objective of Galax-O is to create a secure, reliable, and responsive direct instant messaging solution. It provides a structured, enterprise-ready blueprint for a messaging system that implements security best practices (bcrypt hashing, JWT authentication guards, input validation pipes) and real-time synchronization patterns, while avoiding the latency, network overhead, and concurrency bugs typical of basic web communication architectures.
+
+1.3 Real-World Problem It Solves
+Traditional web collaboration tools suffer from communication lag due to the standard stateless HTTP request-response model, where client browsers must initiate all traffic. In business coordination, social networking, and support desk applications, this latency is unacceptable. Galax-O bridges this gap by establishing stable, low-overhead TCP streams that allow servers to push data to clients instantly as soon as events occur.
+
+1.4 Why a Real-Time Chat Application is Needed
+Communication velocity dictates operational efficiency. Applications like customer support, remote teamwork coordination, and transactional alert delivery require immediate message propagation. Standard REST endpoints cannot push alerts to an offline or waiting browser without resorting to resource-heavy polling. A stateful WebSocket connection is mandatory to achieve immediate text routing with minimal packet headers.
+
+1.5 Functional Requirements
+  * User Lifecycle: User registration with unique usernames, secure logins with credential verification, and profile retrieval.
+  * Direct Messaging (1-to-1): Real-time text routing between active users, with automatic persistence to the Postgres database.
+  * Presence Management: Real-time user list showing who is online/offline with instant status broadcasts upon connection state changes.
+  * Message Receipts: Dynamic status indicators (single tick for sent, double ticks for delivered to socket, blue ticks for read by receiver).
+  * System Auto-Replies: Automated greeting mechanisms ("Thank you for the message") sent once daily per active chat pair, alongside system alerts informing senders when their target is offline.
+
+1.6 Non-Functional Requirements
+  * Sub-Second Latency: Average message transmission time under 100ms.
+  * Data Persistence: Guaranteed chronological message archival and storage.
+  * Security: Hashed passwords, stateless API routing, and handshake verification.
+  * Modularity & Scalability: Clean, decoupled code structure, separating HTTP APIs, persistent schemas, and socket gateways.
+  * Responsive Layout: A fluid, glassmorphic UI matching mobile, tablet, and desktop screens.
+
+1.7 Major Features
+  * Bcrypt-reinforced signup/login.
+  * JWT Stateless Authorization.
+  * Event-driven Socket.IO direct messaging.
+  * Live status broadcasts and user registry updates.
+  * Active unread counters per sender.
+  * Dynamic visual checkmarks (Sent, Delivered, Read).
+  * Render boot-startup detection (ServerLoader) to mitigate cold starts.
+
+1.8 End Users
+  * General users looking for a clean, secure chat client.
+  * Internship and college evaluators looking for a structured, production-grade project documentation base.
+  * Future developers seeking a reference architecture for NestJS + TypeORM + Socket.IO + React.
+
+1.9 High-Level Architecture
+Galax-O utilizes a multi-tier, decoupled architecture:
+  1. Client Layer (React/Vite): Handles UI rendering, browser session storage, state management, Axios API dispatching, and Socket.IO event listeners.
+  2. Gateway/API Layer (NestJS Controllers & Gateways): Exposes REST endpoints for stateless actions and manages persistent WebSocket connections for stateful streams.
+  3. Service Layer (NestJS Services): Implements the core business logic, validation rules, password hashing comparisons, and queries.
+  4. Persistence Layer (TypeORM/PostgreSQL): Maps entities to SQL tables, runs transactional updates, and handles relational database storage.
+
+1.10 Complete Technology Stack
+  * Frontend: React 19, Vite, Axios, Socket.IO Client, React Router DOM 7, Vanilla CSS.
+  * Backend: NestJS 11, TypeScript, Socket.IO, TypeORM, `@nestjs/jwt`, Passport JWT, bcrypt.
+  * Database: PostgreSQL, `pg` driver.
+  * Tools: Git, GitHub, Swagger-UI, Postman, Vercel (UI host), Render (API & DB host).
+
+1.11 Overall Request Flow
+  * Stateless Request: Client -> Axios Interceptor (attaches JWT) -> NestJS Controller -> AuthGuard -> Users/Messages Service -> TypeORM Repository -> PostgreSQL -> JSON Response back to Client.
+  * Stateful Request: Client -> Handshake (token verification) -> WebSocket Connection -> emit("private-message") -> ChatGateway -> MessagesService (persists to SQL) -> Recipient WebSocket ID lookup -> emit("private-message") to recipient -> Client updates state -> UI re-renders with message bubble.
+
+1.12 Why the Chosen Architecture Was Used
+  * Modularity: NestJS enforces structural patterns (controllers, services, modules) preventing spaghetti code. Gaining dependency injection for free simplifies testing and decoupling.
+  * Performance: Node.js's asynchronous, non-blocking single-threaded event loop handles thousands of concurrent WebSocket connections efficiently, unlike multi-threaded platforms which suffer from high thread overhead.
+  * Data Integrity: PostgreSQL ensures ACID compliance, allowing reliable message ordering via auto-incrementing timestamps and relational constraints.
+
+====================================================================
+SECTION 2 — SYSTEM ARCHITECTURE
+====================================================================
+
+2.1 Architecture Diagram & Component Explanations
+The flow from the browser client down to the database layers operates as follows:
+
+```
+[ Client Browser: React / Vite SPA ]
+       |                  |
+       | Axios HTTP       | WebSocket (WSS)
+       | (REST APIs)      | (Stateful Events)
+       v                  v
+[ NestJS Controllers ] [ NestJS ChatGateway ]
+       |                  |
+       +--------+---------+
+                |
+                v
+       [ NestJS Services ]
+                |
+                v
+       [ TypeORM ORM Layer ]
+                |
+                v
+       [ PostgreSQL Database ]
+```
+
+  * React: Implements a virtual DOM, updating the UI dynamically when new socket events occur without full page reloads.
+  * NestJS: Acts as the unified controller-service router, applying validation pipes, CORS policies, and auth guards to secure incoming streams.
+  * PostgreSQL: Relational storage engine that maintains schemas, runs indexes, and guarantees transaction logs.
+  * TypeORM: Abstracts raw SQL generation, preventing SQL injections and transforming relational rows into typed TypeScript objects.
+  * JWT: Decouples server memory from session tables. The backend verifies incoming signatures mathematically using public/secret keys without querying database sessions.
+  * Socket.IO: Resolves browser compatibility issues, handling protocol upgrades and connection drops cleanly.
+
+2.2 REST APIs and WebSockets Working Together
+In Galax-O, REST APIs and WebSockets are complementary:
+  * REST APIs handle slow, transactional operations where metadata overhead is acceptable (e.g., user signup, session creation, loading historical chat archives).
+  * WebSockets handle fast, real-time message forwarding and presence updates where low latency is critical, utilizing the persistent TCP connection established during the handshake.
+
+2.3 Complete Lifecycle of a User
+  1. Signup: Client registers a username. NestJS hashes the password and saves it to PostgreSQL.
+  2. Login: Client submits credentials. NestJS validates them and returns a signed JWT token.
+  3. Handshake & Connect: The client saves the token in `sessionStorage` and connects to the Socket.IO gateway, passing the token in the handshake configuration.
+  4. Online Status: The gateway verifies the token, marks the user as online, and broadcasts the status update to all connected clients.
+  5. Fetching History: The client calls the REST API to load previous chat history.
+  6. Message Flow: User A types a message and sends it via WebSockets. The gateway receives the message, saves it to the database, looks up User B's active socket, and routes the message directly.
+  7. Receipts: User B receives the message, sending a delivery/read receipt back to the server, which updates the database and User A's screen dynamically.
+  8. Disconnect: When User A closes the tab, the server detects the socket drop, updates the presence state, and broadcasts a "user-offline" event.
+
+====================================================================
+SECTION 3 — COMPLETE PROJECT STRUCTURE
+====================================================================
+
+The file layout of the Galax-O workspace is structured as follows:
+
+```
+galax-o/
+├── backend/                             # NestJS Backend API & WebSockets Server
+│   ├── src/                             # Source code root
+│   │   ├── main.ts                      # Application bootstrap configuration
+│   │   ├── app.module.ts                # Root module importing TypeORM & sub-modules
+│   │   ├── app.controller.ts            # Default check-alive controller
+│   │   ├── app.service.ts               # Default check-alive service provider
+│   │   ├── app.controller.spec.ts       # Controller unit testing specifications
+│   │   ├── auth/                        # User authentication module
+│   │   │   ├── auth.controller.ts       # Login and profile REST routes
+│   │   │   ├── auth.service.ts          # Password verification & token signing
+│   │   │   ├── auth.guard.ts            # HTTP Bearer Token authentication guard
+│   │   │   ├── auth.module.ts           # Imports UsersModule and registers JwtService
+│   │   │   ├── constants.ts             # Contains token signature secrets
+│   │   │   ├── auth.controller.spec.ts  # Auth controller unit tests
+│   │   │   └── auth.service.spec.ts     # Auth service unit tests
+│   │   ├── chat/                        # Real-time WebSocket connection module
+│   │   │   ├── chat.gateway.ts          # Main Socket.IO gateway handling events
+│   │   │   ├── chat.module.ts           # Configures chat gateway dependencies
+│   │   │   ├── chat.gateway.spec.ts     # Gateway unit tests
+│   │   │   ├── dto/                     # Chat-specific data validation
+│   │   │   │   └── send-message.dto.ts  # Validation rules for incoming messages
+│   │   │   ├── test-chat.js             # Local testing script for sockets
+│   │   │   ├── test-socket.js           # Generic socket listener test
+│   │   │   ├── test-user1.js            # Mock client connection simulator
+│   │   │   └── test-user2.js            # Mock receiver connection simulator
+│   │   ├── common/                      # Shared helper filters and decorators
+│   │   │   └── filters/                 # Global error catching layer
+│   │   │       └── http-exception.filter.ts # Maps exception payloads to JSON
+│   │   ├── messages/                    # Message features and archives
+│   │   │   ├── dto/                     # Request bodies validation
+│   │   │   │   ├── create-message.dto.ts# Rules for REST API messages
+│   │   │   │   └── update-message.dto.ts# Placeholder for message updates
+│   │   │   ├── entities/                # Database model definitions
+│   │   │   │   └── message.entity.ts    # Maps message fields to SQL columns
+│   │   │   ├── messages.controller.ts   # REST endpoints for message history
+│   │   │   ├── messages.service.ts      # Query execution for message persistence
+│   │   │   ├── messages.module.ts       # Declares TypeORM entity dependencies
+│   │   │   ├── messages.controller.spec.ts # Controller tests
+│   │   │   └── messages.service.spec.ts # Service tests
+│   │   └── users/                       # User management module
+│   │       ├── dto/                     # Registration payload structures
+│   │       │   ├── create-user.dto.ts   # Alphanumeric username & password validation
+│   │       │   └── update-user.dto.ts   # Profile update properties
+│   │       ├── entities/                # Database model definitions
+│   │       │   └── user.entity.ts       # Maps user fields to SQL columns
+│   │       ├── users.controller.ts      # API routes for registration and lookups
+│   │       ├── users.service.ts         # User database queries and password hashing
+│   │       ├── users.module.ts          # Configures user modules
+│   │       ├── users.controller.spec.ts # Controller unit tests
+│   │       └── users.service.spec.ts    # Service unit tests
+│   ├── test/                            # End-to-End integration test directory
+│   ├── nest-cli.json                    # Configuration for NestJS compiler options
+│   ├── package.json                     # Backend scripts and npm package list
+│   ├── tsconfig.json                    # Base TypeScript compiler preferences
+│   └── tsconfig.build.json              # Compilation rules for production builds
+│
+└── frontend/                            # React SPA Client
+    ├── public/                          # Static browser assets (favicon, images)
+    ├── src/                             # Source code root
+    │   ├── main.jsx                     # Renders React into document root
+    │   ├── App.jsx                      # App root handling routing and cold starts
+    │   ├── index.css                    # Global application style variables
+    │   ├── App.css                      # Core app layout configurations
+    │   ├── socket.js                    # Socket.IO client initialization helper
+    │   ├── api/                         # API layer directory
+    │   │   ├── axios.js                 # Axios instance with header interceptor
+    │   │   ├── auth.js                  # Login and register endpoint triggers
+    │   │   ├── messages.js              # Message history endpoint triggers
+    │   │   └── users.js                 # User listing and server check triggers
+    │   ├── components/                  # Shared React components
+    │   │   ├── ProtectedRoute.jsx       # Redirects unauthenticated users
+    │   │   ├── PublicRoute.jsx          # Redirects logged-in users away from auth
+    │   │   └── ServerLoader.jsx         # Render loading screen component
+    │   ├── pages/                       # Application page components
+    │   │   ├── Login.jsx                # Login form and auth submission
+    │   │   ├── Register.jsx             # Registration form and body verification
+    │   │   ├── Chat.jsx                 # Real-time chat panel component
+    │   │   └── Users.jsx                # Placeholder user component
+    │   └── styles/                      # Modular style files
+    │       ├── Auth.css                 # Styles for login and register forms
+    │       ├── Chat.css                 # Chat layout styling
+    │       └── ServerLoader.css         # Cold start loading screen style
+    ├── vite.config.js                   # Vite dev server and proxy rules
+    ├── eslint.config.js                 # ESLint coding standard rules
+    ├── vercel.json                      # Vercel SPA routing fallback rules
+    └── package.json                     # Frontend scripts and npm package list
+```
+
+====================================================================
+SECTION 4 — EVERY FILE
+====================================================================
+
+4.1 BACKEND CORE FILES
+  * main.ts
+    * Purpose: Bootstraps the NestJS server application.
+    * Imports: NestFactory, AppModule, DocumentBuilder, SwaggerModule, ValidationPipe, HttpExceptionFilter.
+    * Exports: None.
+    * Dependencies: NestJS core packages.
+    * Execution: Triggered on server startup (`npm run start:dev` or node execution). It configures the global validation pipe, handles CORS origins, registers the exception filter, compiles Swagger API configurations, and binds the server to `process.env.PORT` (or fallback port 3000).
+
+  * app.module.ts
+    * Purpose: The root module that configures global application settings.
+    * Imports: ConfigModule, TypeOrmModule, UsersModule, AuthModule, MessagesModule, ChatModule.
+    * Exports: None.
+    * Execution: Loaded by `main.ts` during bootstrap. It registers environment variables, configures the TypeORM PostgreSQL connection pool with SSL permissions, loads the database entities, and imports the modules for auth, users, messages, and chat.
+
+  * app.controller.ts & app.service.ts
+    * Purpose: Provide a default check-alive endpoint.
+    * Imports: Controller, Get, AppService.
+    * Exports: AppController, AppService.
+    * Execution: Invoked when a client performs a `GET /` request, returning a "Hello World!" confirmation.
+
+4.2 BACKEND AUTH MODULE
+  * auth.controller.ts
+    * Purpose: Exposes HTTP routes for user authentication.
+    * Imports: Body, Controller, Post, Request, UseGuards, AuthService, CreateUserDto, AuthGuard.
+    * Exports: AuthController.
+    * Functions: `signIn()`, `getProfile()`.
+    * Execution: Invoked when POST requests hit `/auth/login` or GET requests hit `/auth/profile`. It triggers password verification and returns signed tokens.
+
+  * auth.service.ts
+    * Purpose: Implements credential checks and handles JWT creation.
+    * Imports: Injectable, UnauthorizedException, JwtService, UsersService.
+    * Exports: AuthService.
+    * Functions: `signIn()`.
+    * Workflow: Fetches the user by username, checks the password using bcrypt, and generates a signed JWT payload if valid.
+
+  * auth.guard.ts
+    * Purpose: Custom authentication guard protecting API routes.
+    * Imports: CanActivate, ExecutionContext, Injectable, UnauthorizedException, JwtService.
+    * Exports: AuthGuard.
+    * Workflow: Checks the Authorization header for a bearer token, verifies it, and attaches the payload to the request object. If verification fails, it throws an UnauthorizedException.
+
+  * auth.module.ts
+    * Purpose: Configures authentication settings and token signing.
+    * Imports: JwtModule, UsersModule, forwardRef.
+    * Exports: AuthService.
+    * Workflow: Uses `forwardRef` to handle the circular dependency with UsersModule, and registers the JwtModule with the secret key and token expiration configurations.
+
+  * constants.ts
+    * Purpose: Stores the JWT signature secret key.
+    * Exports: `jwtConstants`.
+    * Security warning: Secret is currently hardcoded for reference, but should be loaded from environment variables in production.
+
+4.3 BACKEND USERS MODULE
+  * users.controller.ts
+    * Purpose: Exposes user administration endpoints.
+    * Imports: Controller, Post, Get, Patch, Delete, UsersService, AuthGuard, DTOs.
+    * Exports: UsersController.
+    * Workflow: Routes request payloads to the user services layer.
+
+  * users.service.ts
+    * Purpose: Performs database operations for user records.
+    * Imports: InjectRepository, User entity, Repository, bcrypt.
+    * Exports: UsersService.
+    * Workflow: Hashes passwords using bcrypt during registration and executes TypeORM user queries.
+
+  * user.entity.ts
+    * Purpose: Maps the `User` class to the `user` table in PostgreSQL.
+    * Annotations: `@Entity`, `@PrimaryGeneratedColumn('uuid')`, `@Column({unique:true})`, `@OneToMany`.
+    * Relations: Establishes a 1-to-many relationship with the message entity for sent/received messages.
+
+  * DTO files (create-user.dto.ts, update-user.dto.ts)
+    * Purpose: Validate incoming user registration and modification payloads.
+    * Constraints: Uses class-validator to enforce username (3-30 chars) and password lengths (3-100 chars).
+
+4.4 BACKEND MESSAGES MODULE
+  * messages.controller.ts
+    * Purpose: Exposes endpoints for sending and retrieving messages.
+    * Imports: Controller, Get, Post, MessagesService, AuthGuard.
+    * Exports: MessagesController.
+    * Workflow: Routes requests to send messages or fetch historical conversations.
+
+  * messages.service.ts
+    * Purpose: Executes database operations for message data.
+    * Imports: InjectRepository, User entity, Message entity, Repository.
+    * Exports: MessagesService.
+    * Workflow: Handles message persistence, retrieves chat history, updates delivery/read statuses, and aggregates unread counts.
+
+  * message.entity.ts
+    * Purpose: Maps the `Message` class to the `message` table in PostgreSQL.
+    * Annotations: `@Entity`, `@PrimaryGeneratedColumn('uuid')`, `@ManyToOne`, `@CreateDateColumn`.
+    * Relations: Maps messages to sender and receiver user records.
+
+  * DTO files (create-message.dto.ts, update-message.dto.ts)
+    * Purpose: Validates message payloads, checking text lengths (1-500 chars) and recipient username constraints.
+
+4.5 BACKEND CHAT MODULE
+  * chat.gateway.ts
+    * Purpose: The main real-time coordinator managing Socket.IO connections and events.
+    * Imports: JwtService, WebSocketGateway, SubscribeMessage, MessagesService, UsersService, Socket.io types.
+    * Exports: ChatGateway.
+    * Workflow: Authenticates incoming socket connections, updates in-memory presence maps, broadcasts status updates, and handles private message routing.
+
+  * chat.module.ts
+    * Purpose: Configures gateway dependencies.
+    * Imports: AuthModule, UsersModule, MessagesModule.
+    * Exports: None.
+
+4.6 BACKEND COMMON FILES
+  * http-exception.filter.ts
+    * Purpose: Global filter for catching and formatting HTTP exceptions.
+    * Imports: ExceptionFilter, Catch, ArgumentsHost, HttpException.
+    * Workflow: Intercepts unhandled HTTP exceptions, extracts status codes and error payloads, and returns a standardized JSON response.
+
+4.7 FRONTEND CORE FILES
+  * main.jsx
+    * Purpose: The React application entry point.
+    * Workflow: Mounts the React application into the index.html DOM element and wraps it in a BrowserRouter.
+
+  * App.jsx
+    * Purpose: Configures client-side routing, protected routes, and backend start detection.
+    * Workflow: Periodically calls `/users/loaded` to verify the backend is active before rendering authentication or chat routes.
+
+  * socket.js
+    * Purpose: Configures and exports the Socket.IO client instance, enabling reconnection handling.
+
+  * api/axios.js
+    * Purpose: Configures Axios with request interceptors to automatically attach the bearer token from session storage.
+
+  * api files (auth.js, users.js, messages.js)
+    * Purpose: Declare helper functions for REST API HTTP calls.
+
+  * components (ProtectedRoute.jsx, PublicRoute.jsx, ServerLoader.jsx)
+    * ProtectedRoute: Restricts access to the chat panel if no auth token is present.
+    * PublicRoute: Redirects authenticated users away from the login and registration pages.
+    * ServerLoader: Renders a loading animation during server cold starts.
+
+  * pages (Login.jsx, Register.jsx, Chat.jsx, Users.jsx)
+    * Login / Register: Forms for user authentication.
+    * Chat: Main dashboard rendering active chats, user lists, presence indicators, and message history.
+    * Users: Renders a user management list.
+
+  * styles (Auth.css, Chat.css, ServerLoader.css)
+    * Custom CSS files styling the forms, animations, glassmorphism layouts, and chat bubbles.
+
+====================================================================
+SECTION 5 — EVERY FUNCTION
+====================================================================
+
+5.1 BACKEND FUNCTIONS
+
+  * bootstrap() [main.ts]
+    * Purpose: Initializes the NestJS server application.
+    * Steps: Creates the app instance, enables CORS, registers global validation pipes and exception filters, generates Swagger documentation, and starts the server on the designated port.
+
+  * canActivate(context: ExecutionContext) [auth.guard.ts]
+    * Purpose: Validates incoming HTTP requests by verifying authorization tokens.
+    * Steps: Extracts the request object, checks the Authorization header, validates the JWT token, and attaches the payload data to `request.user`. Returns `true` if valid, otherwise throws an UnauthorizedException.
+
+  * signIn(userName: string, pass: string) [auth.service.ts]
+    * Purpose: Authenticates users and returns signed JWT tokens.
+    * Steps: Fetches the user by username, compares the password hash, and signs a JWT payload (containing user ID and username) if valid.
+
+  * create(createUserDto: CreateUserDto) [users.service.ts]
+    * Purpose: Registers new users in the database.
+    * Steps: Hashes the plain text password using bcrypt, instantiates a User entity, and saves it. Throws a ConflictException if the username already exists.
+
+  * authUser(username: string, password: string) [users.service.ts]
+    * Purpose: Validates user credentials.
+    * Steps: Queries the user table to retrieve the hashed password, and compares it with the plain text input. Returns the user object if verified, otherwise returns null.
+
+  * handleConnection(client: Socket) [chat.gateway.ts]
+    * Purpose: Handles new WebSocket connections.
+    * Steps: Extracts the token from the handshake auth payload, verifies it, updates the online users map, and broadcasts presence updates to connected clients. If verification fails, it disconnects the socket.
+
+  * handleDisconnect(client: Socket) [chat.gateway.ts]
+    * Purpose: Handles socket disconnections.
+    * Steps: Identifies the disconnected user, deletes their socket ID from the maps, and broadcasts updated online user lists to all clients.
+
+  * handleMessage(client: Socket, payload: SendMessageDto) [chat.gateway.ts]
+    * Purpose: Routes private messages between users.
+    * Steps: Verifies the sender, persists the message to the database, checks the recipient's online status, and forwards the message to the active recipient socket. Sends system notifications to the sender if the recipient is offline.
+
+  * create(senderId: string, createMessageDto: CreateMessageDto) [messages.service.ts]
+    * Purpose: Persists messages in PostgreSQL.
+    * Steps: Fetches sender and receiver entities, creates a new Message entity, and saves it. Returns a formatted data transfer object.
+
+  * userhistory(senderId: string, receivername: string) [messages.service.ts]
+    * Purpose: Retrieves conversation history between two users and updates read receipts.
+    * Steps: Fetches the messages, sets `isRead` and `isDelivered` flags to true for incoming messages, updates the records in the database, and returns the message list.
+
+  * unreadCount(loggedInUserId: string) [messages.service.ts]
+    * Purpose: Aggregates unread message counts.
+    * Steps: Retrieves all unread messages for the user, groups them by sender username, and returns the grouped count object.
+
+5.2 FRONTEND FUNCTIONS
+
+  * connectSocket(token) [socket.js]
+    * Purpose: Configures and initializes the Socket.IO client instance.
+    * Steps: Establishes a WebSocket connection with the backend URL, passes the auth token, and registers default lifecycle listeners.
+
+  * App() [App.jsx]
+    * Purpose: Main application component managing state and routing.
+    * Steps: Checks if the backend is awake, rendering a loader if offline, and routes verified users to their respective pages.
+
+  * Chat() [Chat.jsx]
+    * Purpose: Core chat interface component.
+    * Steps: Initializes the user profile and contacts list, registers socket event listeners (for incoming messages, online/offline events, and delivery confirmations), and renders the sidebar and conversation panel.
+
+  * handlePrivateMessage(msg) [Chat.jsx]
+    * Purpose: Processes incoming private messages.
+    * Steps: If the message is from the active conversation, it appends it to the chat history. Otherwise, it increments the unread count for that sender in the contact list.
+
+====================================================================
+SECTION 6 — FRONTEND ARCHITECTURE
+====================================================================
+
+6.1 React Architecture and State Hook Management
+The React frontend is built as a single-page application (SPA) powered by Vite.
+  * State Management: Managed locally using React hooks (`useState`, `useRef`, `useEffect`). Component interactions rely on refs (`selectedUserRef` and `meRef`) to manage mutable state within async socket listener callbacks, avoiding stale closures.
+  * Routing: React Router DOM (v7) coordinates the page routes (`/login`, `/register`, `/chat`). Protected routes redirect unauthenticated users to `/login`, while public routes prevent logged-in users from accessing login screens.
+  * API Layer: Axios interceptors automatically inject the JWT token into headers, decoupling request logic from components.
+  * Socket Integration: The client socket is initialized upon successful authentication, registering event handlers to dynamically update states when other users connect or send messages.
+
+6.2 UI Rendering Lifecycle and Stylesheets
+  * Cold Start Loader: Displays a spinner until the backend responds to the `/users/loaded` endpoint, handling Render's free tier cold starts.
+  * Responsive Layout: CSS grid layouts allow the UI to adapt dynamically. The layout splits into a sidebar list of users and a main chat viewport, which adjusts on mobile screens to show one panel at a time.
+
+====================================================================
+SECTION 7 — BACKEND ARCHITECTURE
+====================================================================
+
+7.1 NestJS Modular Architecture
+NestJS provides a modular framework for structured backend development.
+  * Modules: Define feature boundaries. `AppModule` acts as the root, importing feature-specific modules like `UsersModule`, `AuthModule`, `MessagesModule`, and `ChatModule`.
+  * Controllers: Handle HTTP request routing, parse parameter decorators (`@Body`, `@Param`), and return JSON responses.
+  * Services (Providers): Contain the business logic, database queries, and third-party integrations, injected into controllers and gateways via Dependency Injection (DI).
+  * Data Validation: NestJS uses ValidationPipe combined with class-validator decorators in DTO classes to validate incoming payloads before executing code.
+  * Filters and Guards: Exception filters catch errors globally to return standardized error responses. Auth guards verify JWT signatures on protected routes.
+
+====================================================================
+SECTION 8 — DATABASE DESIGN
+====================================================================
+
+8.1 Relational Schema and Entity Mapping
+The Postgres database is mapped using TypeORM entities:
+  * User Entity: Maps to the `user` table. It contains a unique `userId` (UUID primary key), a unique `username`, and a password column configured with `select: false` to hide hashes by default.
+  * Message Entity: Maps to the `message` table. It contains a `messageId` (UUID primary key), a text content column, status flags (`isRead`, `isDelivered`), and a `createdAt` timestamp.
+  * Relationships: Defined using `@ManyToOne` and `@OneToMany` decorators. A user has a 1-to-many relationship with messages, mapping to `sender` and `receiver` columns on the message table.
+
+```
++------------------+                   +---------------------+
+|      user        |                   |      message        |
++------------------+                   +---------------------+
+| PK | userId      |1 <-------------\  | PK | messageId      |
+|    | username    |                 \-|-FK | senderUserId   |
+|    | password    |1 <-----------------FK | receiverUserId  |
++------------------+                   |    | content        |
+                                       |    | isRead         |
+                                       |    | isDelivered    |
+                                       |    | createdAt      |
+                                       +---------------------+
+```
+
+====================================================================
+SECTION 9 — REST APIs
+====================================================================
+
+Galax-O's REST API endpoints are documented below:
+
+9.1 User Registration (`POST /users`)
+  * Purpose: Registers new accounts.
+  * Auth Required: No.
+  * Request Body: `CreateUserDto` `{ username, password }`.
+  * Response Body: User object `{ userId, username }`.
+  * Validation: Verifies username (3-30 chars) and password (3-100 chars).
+  * Exceptions: Returns a 409 Conflict error if the username is taken.
+
+9.2 Login Session (`POST /auth/login`)
+  * Purpose: Authenticates credentials.
+  * Auth Required: No.
+  * Request Body: `CreateUserDto` `{ username, password }`.
+  * Response Body: Token response `{ statusCode: 201, access_token, userId, username }`.
+  * Exceptions: Returns a 401 Unauthorized error if credentials are invalid.
+
+9.3 User Profile (`GET /auth/profile`)
+  * Purpose: Retrieves authenticated user info.
+  * Auth Required: Yes.
+  * Request Body: None.
+  * Response Body: User payload `{ sub: userId, username }`.
+
+9.4 All Registered Users (`GET /users`)
+  * Purpose: Returns all registered accounts.
+  * Auth Required: No.
+  * Response Body: Array of user objects.
+
+9.5 Conversation History (`GET /messages/:receiver`)
+  * Purpose: Loads historical messages between two users and updates read receipts.
+  * Auth Required: Yes.
+  * Parameters: `receiver` username.
+  * Response Body: Array of message records `{ messageId, sender, receiver, content, createdAt, isRead, isDelivered }`.
+
+9.6 Unread Count Summary (`GET /messages/unread-counts`)
+  * Purpose: Fetches unread message counts grouped by sender.
+  * Auth Required: Yes.
+  * Response Body: Count mapping `{ [senderUsername]: unreadCountNumber }`.
+
+====================================================================
+SECTION 10 — SOCKET.IO IMPLEMENTATION
+====================================================================
+
+10.1 WebSockets Protocol
+WebSockets provide full-duplex TCP streams that eliminate HTTP header overhead. Galax-O uses Socket.IO to manage connection lifecycles, reconnects, and event-based message distribution.
+
+10.2 Event Breakdown
+
+  * Connection Handshake: The client initiates a connection, passing the JWT token. The gateway extracts, verifies the token, and links the socket ID to the user ID in the registry maps.
+  * user-online: Broadcast to all connected users when a client successfully connects.
+  * online-users: Emits the updated list of online usernames to the client.
+  * private-message: The client emits this event to send a message. The gateway persists the message, routes it to the recipient's socket if online, and returns delivery status updates.
+  * message-delivered: Emitted to the sender's socket when a message is successfully delivered to the recipient.
+  * user-offline: Broadcast to all clients when a user disconnects, removing their socket ID from the active maps.
+
+====================================================================
+SECTION 11 — COMPLETE DATA FLOW
+====================================================================
+
+11.1 App Bootup & Server Connection Checking
+```
+Client Browser Load -> App.jsx Mounts -> Loaded State = False
+      |
+      |---> Starts interval every 2s checking: GET /users/loaded
+      |     (Renders <ServerLoader /> UI spinner)
+      |
+      |<--- Server responds with True (loaded = True, interval cleared)
+      |
+   React Route evaluates sessionStorage token -> Redirects to /chat
+```
+
+11.2 Private Message Routing Flow
+```
+User A presses Enter in ChatInput -> Emit 'private-message' event to Gateway
+      |
+   ChatGateway intercept event -> extract sender details from socketToUser map
+      |
+   Triggers MessagesService.create() -> resolves User entities & saves to PostgreSQL
+      |
+   Lookup recipient B in onlineUsers Map
+      |
+      +---> [Found B Client ID] ---> Emits 'private-message' directly to Client B
+      |                              Emits 'private-message' to Client A (UI updates)
+      |                              Emits 'message-delivered' to Client A
+      |
+      +---> [Not Found B] ---------> Emits 'private-message' to Client A
+                                     Emits 'system-message' (user offline notification)
+```
+
+====================================================================
+SECTION 12 — SECURITY
+====================================================================
+
+12.1 Hashing and Token-Based Security
+  * Bcrypt Hashing: Passwords are encrypted on signup using a salted hashing algorithm, protecting credential storage.
+  * JWT Auth Guards: REST endpoints are secured by authentication guards, and WebSocket handshakes verify token validity before opening connections.
+  * Input Validation: NestJS validation pipes sanitize inputs using class-validators, rejecting invalid or malicious payloads.
+  * CORS Safeguards: CORS configurations restrict API access to trusted origins (`http://localhost:5173`, `https://galax-o.vercel.app`), preventing unauthorized cross-origin requests.
+
+====================================================================
+SECTION 13 — CONFIGURATION FILES
+====================================================================
+
+13.1 Configuration Explanations
+  * package.json: Defines project metadata, build scripts (`npm run build`), dependency constraints, and compiler tools.
+  * tsconfig.json: Specifies compiler options like target, module resolution, decorator support, and path mappings.
+  * nest-cli.json: Configures compiler options for NestJS CLI build outputs.
+  * vite.config.js: Configures the frontend development server, plugins, and proxy rules.
+  * vercel.json: Enables client-side routing fallbacks (`rewrites`) on Vercel to support SPA paths.
+
+====================================================================
+SECTION 14 — DEPENDENCIES
+====================================================================
+
+14.1 Key Backend Dependencies
+  * `@nestjs/core`, `@nestjs/common`: Backend framework core.
+  * `@nestjs/typeorm`, `typeorm`, `pg`: Database drivers and ORM mapping.
+  * `@nestjs/websockets`, `@nestjs/platform-socket.io`: Handles WebSocket integrations.
+  * `@nestjs/jwt`, `passport`, `passport-jwt`: JWT token authentication.
+  * `bcrypt`: Secure password hashing.
+  * `class-validator`, `class-transformer`: Input validation.
+
+14.2 Key Frontend Dependencies
+  * `react`, `react-dom`: Component rendering and Virtual DOM reconciliation.
+  * `react-router-dom`: Client-side routing.
+  * `axios`: HTTP request client.
+  * `socket.io-client`: WebSocket client connection management.
+
+====================================================================
+SECTION 15 — DESIGN DECISIONS
+====================================================================
+
+15.1 Architectural Decisions and Trade-offs
+  * NestJS vs Express: NestJS provides a structured, modular architecture with built-in dependency injection, which is cleaner and more maintainable than Express for larger systems.
+  * Relational Database (PostgreSQL) vs Document Database (MongoDB): PostgreSQL is chosen for strict data integrity, table relationships, and transaction logs. MongoDB offers flexible schemas but lacks transactional guarantees.
+  * TypeORM vs Raw SQL: TypeORM abstracts SQL generation, prevents SQL injections, and increases development speed. Raw SQL provides better query optimization control but increases code complexity.
+  * WebSockets vs HTTP Polling: WebSockets enable bi-directional, real-time messaging with low overhead, whereas polling creates excessive request traffic and latency.
+  * Session Storage vs HTTPOnly Cookies: sessionStorage is simple to implement but vulnerable to XSS. Production environments should use secure, HTTPOnly, SameSite cookies to protect tokens.
+
+====================================================================
+SECTION 16 — FUTURE IMPROVEMENTS
+====================================================================
+
+Planned enhancements to scale Galax-O to production grade:
+  * Redis Pub/Sub Adapter: Replaces the in-memory maps to sync user presence and route messages across horizontally scaled backend servers.
+  * Group Chat Rooms: Adding support for group chat entities, member associations, and room-based message broadcasting.
+  * Multimedia File Sharing: Integrating cloud storage (like Amazon S3) to support image and file exchange.
+  * typing-status Events: Real-time typing indicators using client-side listeners and socket emits.
+  * Database Migrations: Transitioning from `synchronize: true` to schema migrations to prevent data loss in production.
+  * Containerization (Docker): Dockerizing the application to standardize environment setups and deployment pipelines.
